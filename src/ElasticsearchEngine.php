@@ -48,10 +48,9 @@ class ElasticsearchEngine extends Engine
                 $model->pushSoftDeleteMetadata();
             }
 
-            $doc = collect(array_merge(
-                $model->toSearchableArray(),
-                $model->scoutMetadata()
-            ));
+            $array = array_merge(
+                $model->toSearchableArray(), $model->scoutMetadata()
+            );
 
             if (empty($array)) {
                 return;
