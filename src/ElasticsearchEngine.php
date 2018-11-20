@@ -2,7 +2,6 @@
 
 namespace Jenky\ScoutElasticsearch;
 
-use Illuminate\Config\Repository as Config;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
 
