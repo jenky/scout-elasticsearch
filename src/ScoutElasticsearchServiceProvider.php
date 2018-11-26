@@ -3,9 +3,10 @@
 namespace Jenky\ScoutElasticsearch;
 
 use Elasticsearch\ClientBuilder;
-use Illuminate\Support\ServiceProvider;
 use Laravel\Scout\EngineManager;
-use ScoutEngines\Elasticsearch\ElasticsearchEngine;
+use Illuminate\Support\ServiceProvider;
+use Cviebrock\LaravelElasticsearch\Manager;
+use Cviebrock\LaravelElasticsearch\ServiceProvider as ElasticsearchServiceProvider;
 
 class ScoutElasticsearchServiceProvider extends ServiceProvider
 {
@@ -16,14 +17,12 @@ class ScoutElasticsearchServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->app->singleton('scout.elasticsearch', function ($app) {
-            return ClientBuilder::fromConfig(
-                $app['config']->get('scout.elasticsearch.client', [])
-            );
-        });
+        if (! $this->app->bound(ElasticsearchServiceProvider::class)) {
+            $this->app->register(ElasticsearchServiceProvider::class);
+        }
 
-        $this->app[EngineManager::class]->exetend('elasticsearch', function ($app) {
-            return new ElasticsearchEngine($app['scout.elasticsearch']);
+        $this->app[EngineManager::class]->extend('elasticsearch', function ($app) {
+            return new ElasticsearchEngine($app[Manager::class]);
         });
     }
 }
