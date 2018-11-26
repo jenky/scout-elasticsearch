@@ -5,7 +5,6 @@ namespace Jenky\ScoutElasticsearch;
 use Elasticsearch\Client;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
-use Cviebrock\LaravelElasticsearch\Manager;
 
 class ElasticsearchEngine extends Engine
 {
@@ -20,18 +19,12 @@ class ElasticsearchEngine extends Engine
     protected $elastic;
 
     /**
-     *
-     * @var bool
-     */
-    protected static $indexCreated;
-
-    /**
      * Create new elasticsearch engine driver.
      *
-     * @param  \Cviebrock\LaravelElasticsearch\Manager $client
+     * @param  \Elasticsearch\Client $client
      * @return void
      */
-    public function __construct(Manager $client)
+    public function __construct(Client $client)
     {
         $this->elastic = $client;
     }
@@ -47,8 +40,6 @@ class ElasticsearchEngine extends Engine
         if ($models->isEmpty()) {
             return;
         }
-
-        $this->createOrUpdateIndex($models->first());
 
         $params['body'] = [];
 
@@ -91,8 +82,6 @@ class ElasticsearchEngine extends Engine
      */
     public function delete($models)
     {
-        $this->createOrUpdateIndex($models->first());
-
         $params['body'] = [];
 
         $models->each(function ($model) use (&$params) {
@@ -163,11 +152,12 @@ class ElasticsearchEngine extends Engine
                 'query' => [
                     'bool' => [
                         'must' => [
-                            [
-                                'query_string' => [
-                                    'query' => $query,
-                                ],
+                            'query_string' => [
+                                'query' => $query,
                             ],
+                            // 'match' => [
+                            //     '_all' => $query,
+                            // ]
                         ],
                     ],
                 ],
@@ -298,79 +288,5 @@ class ElasticsearchEngine extends Engine
     public function flush($model)
     {
         $this->elastic->indices()->flush(['index' => $model->searchableAs()]);
-    }
-
-    /**
-     * Create new Elasticsearch index.
-     *
-     * @param \Illuminate\Database\Eloquent\Model $model
-     * @return void
-     */
-    protected function createIndex($model)
-    {
-        $this->elastic->indices()->create($model->getIndexConfig());
-    }
-
-    /**
-     * Update Elasticsearch index.
-     *
-     * @param \Illuminate\Database\Eloquent\Model $model
-     * @return void
-     */
-    protected function updateIndex($model)
-    {
-        $data = ['index' => $model->searchableAs()];
-
-        // Todo: Update index settings and mapping.
-        // $this->elastic->indices()->putSettings([
-        //     array_except($model->getIndexConfig(), 'body.mappings'),
-        // ]);
-
-        // $this->elastic->indices()->putMappting([
-        //     'index' => $model->searchableAs(),
-        //     'type' => static::DEFAULT_TYPE,
-        //     'body' => $model->getIndexMapping(),
-        // ]);
-    }
-
-    /**
-     * Delete Elasticsearch index.
-     *
-     * @param \Illuminate\Database\Eloquent\Model $model
-     * @return void
-     */
-    protected function deleteIndex($model)
-    {
-        $this->elastic->indices()->delete(['index' => $model->searchableAs()]);
-    }
-
-    /**
-     * Create or update Elasticsearch index.
-     *
-     * @param \Illuminate\Database\Eloquent\Model $model
-     * @return void
-     */
-    protected function createOrUpdateIndex($model)
-    {
-        if ($this->isIndexExists($model)) {
-            $this->updateIndex($model);
-        } else {
-            $this->createIndex($model);
-        }
-    }
-
-    /**
-     * Check if whether Elasticsearch index existed.
-     *
-     * @param \Illuminate\Database\Eloquent\Model $model
-     * @return void
-     */
-    protected function isIndexExists($model)
-    {
-        if (is_null(static::$indexCreated)) {
-            static::$indexCreated = $this->elastic->indices()->exists(['index' => $model->searchableAs()]);
-        }
-
-        return static::$indexCreated;
     }
 }

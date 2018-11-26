@@ -57,6 +57,36 @@ trait ScoutElasticsearch
      */
     public function getIndexProperties(): array
     {
-        return [];
+        return $this->dynamicProperties();
+    }
+
+    /**
+     * Generate dynamic properties.
+     *
+     * @return array
+     */
+    protected function dynamicProperties()
+    {
+        $properties = [];
+
+        if ($this->getIncrementing()) {
+            $properties[$this->getKeyName()] = [
+                'type' => 'integer',
+            ];
+        }
+
+        if ($this->usesTimestamps()) {
+            $properties[$this->getCreatedAtColumn()] = [
+                'type' => 'date',
+                'format' => 'yyyy-MM-dd HH:mm:ss',
+            ];
+
+            $properties[$this->getUpdatedAtColumn()] = [
+                'type' => 'date',
+                'format' => 'yyyy-MM-dd HH:mm:ss',
+            ];
+        }
+
+        return $properties;
     }
 }
