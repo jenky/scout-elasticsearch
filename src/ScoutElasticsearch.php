@@ -5,6 +5,20 @@ namespace Jenky\ScoutElasticsearch;
 trait ScoutElasticsearch
 {
     /**
+     * Perform a search against the model's indexed data.
+     *
+     * @param  array  $query
+     * @param  Closure  $callback
+     * @return \Laravel\Scout\Builder
+     */
+    public static function searchRaw(array $query, $callback = null)
+    {
+        $query = new ElasticsearchQuery($query);
+
+        return static::search($query, $callback);
+    }
+
+    /**
      * Get the Elasticsearch index configuration.
      *
      * @return array
@@ -57,15 +71,16 @@ trait ScoutElasticsearch
      */
     public function getIndexProperties(): array
     {
-        return $this->dynamicProperties();
+        return $this->generateProperties();
     }
 
     /**
      * Generate dynamic properties.
      *
+     * @param  array $data
      * @return array
      */
-    protected function dynamicProperties()
+    protected function generateProperties(array $data = [])
     {
         $properties = [];
 
@@ -87,6 +102,6 @@ trait ScoutElasticsearch
             ];
         }
 
-        return $properties;
+        return array_merge($properties, $data);
     }
 }

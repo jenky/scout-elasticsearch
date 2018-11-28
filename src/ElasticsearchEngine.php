@@ -142,26 +142,16 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
-        $filter = config('scout.elasticsearch.filter');
-        $query = str_replace($filter, '', $builder->query);
+        if ($builder->query instanceof ElasticsearchQuery) {
+            $query = $builder->query->toArray();
+        } else {
+            $query = (new ElasticsearchQuery($builder->query))->toArray();
+        }
 
         $params = [
             'index' => $builder->model->searchableAs(),
             'type' => static::DEFAULT_TYPE,
-            'body' => [
-                'query' => [
-                    'bool' => [
-                        'must' => [
-                            'query_string' => [
-                                'query' => $query,
-                            ],
-                            // 'match' => [
-                            //     '_all' => $query,
-                            // ]
-                        ],
-                    ],
-                ],
-            ],
+            'body' => $query,
         ];
 
         if ($sort = $this->sort($builder)) {
@@ -172,9 +162,7 @@ class ElasticsearchEngine extends Engine
             $params['body']['from'] = $options['from'];
         }
 
-        if (isset($options['size'])) {
-            $params['body']['size'] = $options['size'];
-        }
+        $params['body']['size'] = $options['size'] ?? $builder->model->getPerPage();
 
         if (isset($options['numericFilters']) && count($options['numericFilters'])) {
             $params['body']['query']['bool']['must'] = array_merge(
