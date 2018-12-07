@@ -106,7 +106,6 @@ class ElasticsearchEngine extends Engine
     public function search(Builder $builder)
     {
         return $this->performSearch($builder, array_filter([
-            'numericFilters' => $this->filters($builder),
             'size' => $builder->limit,
         ]));
     }
@@ -122,7 +121,6 @@ class ElasticsearchEngine extends Engine
     public function paginate(Builder $builder, $perPage, $page)
     {
         $result = $this->performSearch($builder, [
-            'numericFilters' => $this->filters($builder),
             'from' => (($page * $perPage) - $perPage),
             'size' => $perPage,
         ]);
@@ -142,34 +140,11 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
-        if ($builder->query instanceof ElasticsearchQuery) {
-            $query = $builder->query->toArray();
-        } else {
-            $query = (new ElasticsearchQuery($builder->query))->toArray();
-        }
-
         $params = [
             'index' => $builder->model->searchableAs(),
             'type' => static::DEFAULT_TYPE,
-            'body' => $query,
+            'body' => (new QueryBuilder($builder, $options))->toArray(),
         ];
-
-        if ($sort = $this->sort($builder)) {
-            $params['body']['sort'] = $sort;
-        }
-
-        if (isset($options['from'])) {
-            $params['body']['from'] = $options['from'];
-        }
-
-        $params['body']['size'] = $options['size'] ?? $builder->model->getPerPage();
-
-        if (isset($options['numericFilters']) && count($options['numericFilters'])) {
-            $params['body']['query']['bool']['must'] = array_merge(
-                $params['body']['query']['bool']['must'],
-                $options['numericFilters']
-            );
-        }
 
         if ($builder->callback) {
             return call_user_func(
@@ -181,39 +156,6 @@ class ElasticsearchEngine extends Engine
         }
 
         return $this->elastic->search($params);
-    }
-
-    /**
-     * Get the filter array for the query.
-     *
-     * @param  \Laravel\Scout\Builder  $builder
-     * @return array
-     */
-    protected function filters(Builder $builder)
-    {
-        return collect($builder->wheres)->map(function ($value, $key) {
-            if (is_array($value)) {
-                return ['terms' => [$key => $value]];
-            }
-            return ['match_phrase' => [$key => $value]];
-        })->values()->all();
-    }
-
-    /**
-     * Generates the sort if theres any.
-     *
-     * @param  \Laravel\Scout\Builder $builder
-     * @return array|null
-     */
-    protected function sort($builder)
-    {
-        if (count($builder->orders) == 0) {
-            return;
-        }
-
-        return collect($builder->orders)->map(function ($order) {
-            return [$order['column'] => $order['direction']];
-        })->toArray();
     }
 
     /**
