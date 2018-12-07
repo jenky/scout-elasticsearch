@@ -2,9 +2,8 @@
 
 namespace Jenky\ScoutElasticsearch\Console;
 
-use Cviebrock\LaravelElasticsearch\Manager;
-use Illuminate\Config\Repository as Config;
 use Illuminate\Console\Command;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
 
 class CreateIndexCommand extends Command
 {
@@ -27,15 +26,14 @@ class CreateIndexCommand extends Command
     /**
      * Execute the console command.
      *
+     * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Client $client
      * @return void
      */
-    public function handle(Manager $elastic, Config $config)
+    public function handle(Client $client)
     {
         $class = $this->argument('model');
 
         $model = new $class;
-
-        $client = $elastic->connection($config->get('scout.elasticsearch.connection'));
 
         if ($this->option('force')) {
             if ($client->indices()->exists(['index' => $model->searchableAs()])) {

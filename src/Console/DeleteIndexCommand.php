@@ -2,9 +2,8 @@
 
 namespace Jenky\ScoutElasticsearch\Console;
 
-use Cviebrock\LaravelElasticsearch\Manager;
-use Illuminate\Config\Repository as Config;
 use Illuminate\Console\Command;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
 
 class DeleteIndexCommand extends Command
 {
@@ -25,15 +24,14 @@ class DeleteIndexCommand extends Command
     /**
      * Execute the console command.
      *
+     * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Client $client
      * @return void
      */
-    public function handle(Manager $elastic, Config $config)
+    public function handle(Client $client)
     {
         $class = $this->argument('model');
 
         $model = new $class;
-
-        $client = $elastic->connection($config->get('scout.elasticsearch.connection'));
 
         $client->indices()->delete(['index' => $model->searchableAs()]);
 

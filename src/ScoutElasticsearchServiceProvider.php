@@ -2,12 +2,9 @@
 
 namespace Jenky\ScoutElasticsearch;
 
-use Cviebrock\LaravelElasticsearch\Manager;
 use Cviebrock\LaravelElasticsearch\ServiceProvider as ElasticsearchServiceProvider;
 use Illuminate\Support\ServiceProvider;
-use Jenky\ScoutElasticsearch\Console\CreateIndexCommand;
-use Jenky\ScoutElasticsearch\Console\DeleteIndexCommand;
-use Jenky\ScoutElasticsearch\Console\UpdateIndexCommand;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
 use Laravel\Scout\EngineManager;
 
 class ScoutElasticsearchServiceProvider extends ServiceProvider
@@ -25,16 +22,20 @@ class ScoutElasticsearchServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                CreateIndexCommand::class,
-                UpdateIndexCommand::class,
-                DeleteIndexCommand::class,
+                Console\CreateIndexCommand::class,
+                Console\UpdateIndexCommand::class,
+                Console\DeleteIndexCommand::class,
             ]);
         }
 
-        $this->app[EngineManager::class]->extend('elasticsearch', function ($app) {
-            $client = $app[Manager::class]->connection($app['config']->get('scout.elasticsearch.connection'));
+        $this->app->singleton('elastic.scout.client', Client::class);
 
-            return new ElasticsearchEngine($client);
+        $this->app->when(Client::class)
+            ->needs('$connection')
+            ->give($this->app['config']->get('scout.elasticsearch.connection'));
+
+        $this->app[EngineManager::class]->extend('elasticsearch', function ($app) {
+            return new ElasticsearchEngine($app->make(Client::class));
         });
     }
 }

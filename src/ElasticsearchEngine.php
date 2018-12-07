@@ -2,7 +2,8 @@
 
 namespace Jenky\ScoutElasticsearch;
 
-use Elasticsearch\Client;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
+use Jenky\ScoutElasticsearch\Elasticsearch\Query;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
 
@@ -21,7 +22,7 @@ class ElasticsearchEngine extends Engine
     /**
      * Create new elasticsearch engine driver.
      *
-     * @param  \Elasticsearch\Client $client
+     * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Client $client
      * @return void
      */
     public function __construct(Client $client)
@@ -44,7 +45,7 @@ class ElasticsearchEngine extends Engine
         $params['body'] = [];
 
         $models->each(function ($model) use (&$params) {
-            if ($model::usesSoftDelete() && config('scout.soft_delete', false)) {
+            if ($this->usesSoftDelete($model) && config('scout.soft_delete', false)) {
                 $model->pushSoftDeleteMetadata();
             }
 
@@ -106,7 +107,6 @@ class ElasticsearchEngine extends Engine
     public function search(Builder $builder)
     {
         return $this->performSearch($builder, array_filter([
-            'numericFilters' => $this->filters($builder),
             'size' => $builder->limit,
         ]));
     }
@@ -122,7 +122,6 @@ class ElasticsearchEngine extends Engine
     public function paginate(Builder $builder, $perPage, $page)
     {
         $result = $this->performSearch($builder, [
-            'numericFilters' => $this->filters($builder),
             'from' => (($page * $perPage) - $perPage),
             'size' => $perPage,
         ]);
@@ -142,78 +141,24 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
-        if ($builder->query instanceof ElasticsearchQuery) {
-            $query = $builder->query->toArray();
-        } else {
-            $query = (new ElasticsearchQuery($builder->query))->toArray();
-        }
+        $query = new Query($builder, $options);
 
         $params = [
             'index' => $builder->model->searchableAs(),
             'type' => static::DEFAULT_TYPE,
-            'body' => $query,
+            'body' => $query->toArray(),
         ];
-
-        if ($sort = $this->sort($builder)) {
-            $params['body']['sort'] = $sort;
-        }
-
-        if (isset($options['from'])) {
-            $params['body']['from'] = $options['from'];
-        }
-
-        $params['body']['size'] = $options['size'] ?? $builder->model->getPerPage();
-
-        if (isset($options['numericFilters']) && count($options['numericFilters'])) {
-            $params['body']['query']['bool']['must'] = array_merge(
-                $params['body']['query']['bool']['must'],
-                $options['numericFilters']
-            );
-        }
 
         if ($builder->callback) {
             return call_user_func(
                 $builder->callback,
                 $this->elastic,
-                $builder->query,
+                $query,
                 $params
             );
         }
 
         return $this->elastic->search($params);
-    }
-
-    /**
-     * Get the filter array for the query.
-     *
-     * @param  \Laravel\Scout\Builder  $builder
-     * @return array
-     */
-    protected function filters(Builder $builder)
-    {
-        return collect($builder->wheres)->map(function ($value, $key) {
-            if (is_array($value)) {
-                return ['terms' => [$key => $value]];
-            }
-            return ['match_phrase' => [$key => $value]];
-        })->values()->all();
-    }
-
-    /**
-     * Generates the sort if theres any.
-     *
-     * @param  \Laravel\Scout\Builder $builder
-     * @return array|null
-     */
-    protected function sort($builder)
-    {
-        if (count($builder->orders) == 0) {
-            return;
-        }
-
-        return collect($builder->orders)->map(function ($order) {
-            return [$order['column'] => $order['direction']];
-        })->toArray();
     }
 
     /**
@@ -276,5 +221,16 @@ class ElasticsearchEngine extends Engine
     public function flush($model)
     {
         $this->elastic->indices()->flush(['index' => $model->searchableAs()]);
+    }
+
+    /**
+     * Determine if the given model uses soft deletes.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @return bool
+     */
+    protected function usesSoftDelete($model)
+    {
+        return in_array(SoftDeletes::class, class_uses_recursive($model));
     }
 }

@@ -5,20 +5,6 @@ namespace Jenky\ScoutElasticsearch;
 trait ScoutElasticsearch
 {
     /**
-     * Perform a search against the model's indexed data.
-     *
-     * @param  array  $query
-     * @param  Closure  $callback
-     * @return \Laravel\Scout\Builder
-     */
-    public static function searchRaw(array $query, $callback = null)
-    {
-        $query = new ElasticsearchQuery($query);
-
-        return static::search($query, $callback);
-    }
-
-    /**
      * Get the Elasticsearch index configuration.
      *
      * @return array
@@ -99,6 +85,14 @@ trait ScoutElasticsearch
             $properties[$this->getUpdatedAtColumn()] = [
                 'type' => 'date',
                 'format' => 'yyyy-MM-dd HH:mm:ss',
+            ];
+        }
+
+        $softDelete = static::usesSoftDelete() && config('scout.soft_delete', false);
+
+        if ($softDelete) {
+            $properties['__soft_deleted'] = [
+                'type' => 'boolean',
             ];
         }
 

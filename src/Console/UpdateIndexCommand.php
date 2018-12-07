@@ -2,9 +2,8 @@
 
 namespace Jenky\ScoutElasticsearch\Console;
 
-use Cviebrock\LaravelElasticsearch\Manager;
-use Illuminate\Config\Repository as Config;
 use Illuminate\Console\Command;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
 use Jenky\ScoutElasticsearch\ElasticsearchEngine;
 
 class UpdateIndexCommand extends Command
@@ -28,9 +27,10 @@ class UpdateIndexCommand extends Command
     /**
      * Execute the console command.
      *
+     * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Client $client
      * @return void
      */
-    public function handle(Manager $elastic, Config $config)
+    public function handle(Client $client)
     {
         $class = $this->argument('model');
 
@@ -48,8 +48,6 @@ class UpdateIndexCommand extends Command
 
             return;
         }
-
-        $client = $elastic->connection($config->get('scout.elasticsearch.connection'));
 
         $settings = array_except($model->getIndexConfig(), 'body.mappings');
 
