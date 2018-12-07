@@ -140,17 +140,19 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
+        $query = new QueryBuilder($builder, $options);
+
         $params = [
             'index' => $builder->model->searchableAs(),
             'type' => static::DEFAULT_TYPE,
-            'body' => (new QueryBuilder($builder, $options))->toArray(),
+            'body' => $query->toArray(),
         ];
 
         if ($builder->callback) {
             return call_user_func(
                 $builder->callback,
                 $this->elastic,
-                $builder->query,
+                $query,
                 $params
             );
         }

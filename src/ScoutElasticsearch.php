@@ -102,6 +102,14 @@ trait ScoutElasticsearch
             ];
         }
 
+        $softDelete = static::usesSoftDelete() && config('scout.soft_delete', false);
+
+        if ($softDelete) {
+            $properties['__soft_deleted'] = [
+                'type' => 'boolean',
+            ];
+        }
+
         return array_merge($properties, $data);
     }
 }

@@ -49,6 +49,26 @@ class QueryBuilder implements Arrayable
     }
 
     /**
+     * Get the Scout builder instance.
+     *
+     * @return \Laravel\Scout\Builder
+     */
+    public function getBuilder(): Builder
+    {
+        return $this->builder;
+    }
+
+    /**
+     * Get the builder option.
+     *
+     * @return array
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
+    /**
      * Parse the builder and add necessary queries.
      *
      * @return void
