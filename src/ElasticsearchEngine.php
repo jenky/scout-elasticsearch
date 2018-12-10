@@ -2,10 +2,11 @@
 
 namespace Jenky\ScoutElasticsearch;
 
-use Jenky\ScoutElasticsearch\Elasticsearch\Client;
-use Jenky\ScoutElasticsearch\Elasticsearch\Query;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Jenky\ScoutElasticsearch\Elasticsearch\Query;
+use Jenky\ScoutElasticsearch\Elasticsearch\Client;
 
 class ElasticsearchEngine extends Engine
 {

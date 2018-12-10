@@ -43,7 +43,7 @@ class CreateIndexCommand extends Command
             }
         }
 
-        $client->indices()->create($model->getIndexConfig());
+        $client->indices()->create($model->elasticsearchIndex()->getConfig());
 
         $this->info('Created elasticsearch index for model ['.$class.'].');
 

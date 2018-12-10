@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Elasticsearch;
+
+use Jenky\ScoutElasticsearch\Elasticsearch\Index;
+
+class DummyIndex extends Index
+{
+    /**
+     * Get the Elasticsearch index mapping properties.
+     *
+     * @return array
+     */
+    public function getProperties() : array
+    {
+        $properties = $this->generateProperties();
+
+        //
+
+        return $properties;
+    }
+}

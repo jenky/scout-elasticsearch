@@ -49,7 +49,7 @@ class UpdateIndexCommand extends Command
             return;
         }
 
-        $settings = array_except($model->getIndexConfig(), 'body.mappings');
+        $config = $model->elasticsearchIndex()->getConfig();
 
         if ($this->option('import')) {
             $this->call('scout:flush', [
@@ -59,14 +59,14 @@ class UpdateIndexCommand extends Command
 
         if (! empty(array_get($settings, 'body.settings'))) {
             $client->indices()->putSettings([
-                $settings,
+                array_except($config, 'body.mappings'),
             ]);
         }
 
         $client->indices()->putMapping([
             'index' => $model->searchableAs(),
             'type' => ElasticsearchEngine::DEFAULT_TYPE,
-            'body' => $model->getIndexMapping(),
+            'body' => array_get($config, 'body.mappings'),
         ]);
 
         $this->info('Update elasticsearch index settings and mapping for model ['.$class.'].');

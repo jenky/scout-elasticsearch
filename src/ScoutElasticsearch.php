@@ -2,100 +2,26 @@
 
 namespace Jenky\ScoutElasticsearch;
 
+use Jenky\ScoutElasticsearch\Elasticsearch\Index;
+use InvalidArgumentException;
+
 trait ScoutElasticsearch
 {
     /**
-     * Get the Elasticsearch index configuration.
+     * Get the elasticsearch index instance.
      *
-     * @return array
+     * @throws \InvalidArgumentException
+     * @return \Jenky\ScoutElasticsearch\Elasticsearch\Index
      */
-    public function getIndexConfig(): array
+    public function elasticsearchIndex()
     {
-        return [
-            'index' => $this->searchableAs(),
-            'body' => array_filter([
-                'settings' => $this->getIndexSettings(),
-                'mappings' => $this->getIndexMapping(),
-            ]),
-        ];
-    }
+        $class = property_exists($this, 'elasticsearchIndex') ? $this->elasticsearchIndex : Index::class;
+        $index = new $class($this);
 
-    /**
-     * Get the Elasticsearch index settings.
-     *
-     * @return array
-     */
-    public function getIndexSettings(): array
-    {
-        return [
-            // 'number_of_shards' => 3,
-            // 'number_of_replicas' => 2,
-        ];
-    }
-
-    /**
-     * Get the Elasticsearch index mapping.
-     *
-     * @return array
-     */
-    public function getIndexMapping(): array
-    {
-        return [
-            ElasticsearchEngine::DEFAULT_TYPE => [
-                '_source' => [
-                    'enabled' => true,
-                ],
-                'properties' => $this->getIndexProperties(),
-            ],
-        ];
-    }
-
-    /**
-     * Get the Elasticsearch index mapping properties.
-     *
-     * @return array
-     */
-    public function getIndexProperties(): array
-    {
-        return $this->generateProperties();
-    }
-
-    /**
-     * Generate dynamic properties.
-     *
-     * @param  array $data
-     * @return array
-     */
-    protected function generateProperties(array $data = [])
-    {
-        $properties = [];
-
-        if ($this->getIncrementing()) {
-            $properties[$this->getKeyName()] = [
-                'type' => 'integer',
-            ];
+        if ($index instanceof Index) {
+            return $index;
         }
 
-        if ($this->usesTimestamps()) {
-            $properties[$this->getCreatedAtColumn()] = [
-                'type' => 'date',
-                'format' => 'yyyy-MM-dd HH:mm:ss',
-            ];
-
-            $properties[$this->getUpdatedAtColumn()] = [
-                'type' => 'date',
-                'format' => 'yyyy-MM-dd HH:mm:ss',
-            ];
-        }
-
-        $softDelete = static::usesSoftDelete() && config('scout.soft_delete', false);
-
-        if ($softDelete) {
-            $properties['__soft_deleted'] = [
-                'type' => 'boolean',
-            ];
-        }
-
-        return array_merge($properties, $data);
+        throw new InvalidArgumentException('The index must be instance of '. Index::class);
     }
 }
