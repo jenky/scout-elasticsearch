@@ -77,7 +77,9 @@ class Query implements Arrayable
     protected function parseBuilder()
     {
         if (is_string($this->builder->query)) {
-            $this->search->addQuery(new QueryStringQuery($this->builder->query));
+            if ($this->builder->query || $this->builder->query != '*') {
+                $this->search->addQuery(new QueryStringQuery($this->builder->query));
+            }
         }
 
         foreach ($this->builder->wheres ?: [] as $column => $value) {
