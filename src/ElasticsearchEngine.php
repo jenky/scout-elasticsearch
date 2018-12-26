@@ -4,6 +4,7 @@ namespace Jenky\ScoutElasticsearch;
 
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Jenky\ScoutElasticsearch\Elasticsearch\Query;
 use Jenky\ScoutElasticsearch\Elasticsearch\Client;
@@ -32,6 +33,19 @@ class ElasticsearchEngine extends Engine
     }
 
     /**
+     * Create index if not exists.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model $model
+     * @return void
+     */
+    protected function initIndex(Model $model)
+    {
+        if (! $this->elastic->indices()->exists(['index' => $model->elasticsearchIndex()->getIndexName()])) {
+            // Create new index.
+        }
+    }
+
+    /**
      * Update the given model in the index.
      *
      * @param  \Illuminate\Database\Eloquent\Collection  $models
@@ -42,6 +56,8 @@ class ElasticsearchEngine extends Engine
         if ($models->isEmpty()) {
             return;
         }
+
+        $this->initIndex($models->first());
 
         $params['body'] = [];
 
@@ -60,17 +76,14 @@ class ElasticsearchEngine extends Engine
             }
 
             $params['body'][] = [
-                'update' => [
+                'index' => [
                     '_id' => $model->getScoutKey(),
-                    '_index' => $model->searchableAs(),
+                    '_index' => $model->elasticsearchIndex()->getIndexName(),
                     '_type' => static::DEFAULT_TYPE,
                 ],
             ];
 
-            $params['body'][] = [
-                'doc' => $array,
-                'doc_as_upsert' => true,
-            ];
+            $params['body'][] = $array;
         });
 
         $this->elastic->bulk($params);
@@ -136,8 +149,7 @@ class ElasticsearchEngine extends Engine
      * Perform the given search on the engine.
      *
      * @param  \Laravel\Scout\Builder  $builder
-     * @param  int  $perPage
-     * @param  int  $page
+     * @param  array $options
      * @return mixed
      */
     protected function performSearch(Builder $builder, array $options = [])
@@ -184,22 +196,16 @@ class ElasticsearchEngine extends Engine
     public function map(Builder $builder, $results, $model)
     {
         if ($results['hits']['total'] === 0) {
-            return collect([]);
+            return $model->newCollection();
         }
 
-        $keys = collect($results['hits']['hits'])
-            ->pluck('_id')->values()->all();
+        $objectIds = collect($results['hits']['hits'])->pluck('objectID')->values()->all();
 
-        $models = $model->getScoutModelsByIds(
-            $builder,
-            $keys
-        )->keyBy(function ($model) {
-            return $model->getScoutKey();
+        return $model->getScoutModelsByIds(
+            $builder, $objectIds
+        )->filter(function ($model) use ($objectIds) {
+            return in_array($model->getScoutKey(), $objectIds);
         });
-
-        return collect($results['hits']['hits'])->map(function ($hit) use ($model, $models) {
-            return isset($models[$hit['_id']]) ? $models[$hit['_id']] : null;
-        })->filter()->values();
     }
 
     /**
