@@ -4,9 +4,9 @@ namespace Jenky\ScoutElasticsearch\Elasticsearch;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Jenky\ScoutElasticsearch\ElasticsearchEngine;
+use Jenky\LaravelElasticsearch\Storage\Index as BaseIndex;
 
-class Index
+class Index extends BaseIndex
 {
     /**
      * @var \Illuminate\Database\Eloquent\Model
@@ -22,62 +22,25 @@ class Index
     public function __construct(Model $model)
     {
         $this->model = $model;
+        $this->setConnection(config('scout.elasticsearch.connection'));
     }
 
     /**
-     * Get the Elasticsearch index configuration.
-     *
-     * @return array
+     * {@inheritdoc}
      */
-    public function getConfig() : array
+    public function name(): string
     {
-        return [
-            'index' => $this->model->searchableAs(),
-            'body' => array_filter([
-                'settings' => $this->getSettings(),
-                'mappings' => $this->getMapping(),
-            ]),
-        ];
+        return $this->model->searchableAs();
     }
 
     /**
-     * Get the Elasticsearch index settings.
-     *
-     * @return array
+     * {@inheritdoc}
      */
-    public function getSettings() : array
+    public function searchableAs(): string
     {
-        return [
-            // 'number_of_shards' => 3,
-            // 'number_of_replicas' => 2,
-        ];
-    }
+        $alias = $this->model->searchableAs();
 
-    /**
-     * Get the Elasticsearch index mapping.
-     *
-     * @return array
-     */
-    public function getMapping() : array
-    {
-        return [
-            ElasticsearchEngine::DEFAULT_TYPE => [
-                '_source' => [
-                    'enabled' => true,
-                ],
-                'properties' => $this->getProperties(),
-            ],
-        ];
-    }
-
-    /**
-     * Get the Elasticsearch index mapping properties.
-     *
-     * @return array
-     */
-    public function getProperties() : array
-    {
-        return $this->generateProperties();
+        return $this->multipleIndices ? $alias.'*' : $alias;
     }
 
     /**

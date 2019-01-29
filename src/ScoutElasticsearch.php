@@ -3,7 +3,6 @@
 namespace Jenky\ScoutElasticsearch;
 
 use Jenky\ScoutElasticsearch\Elasticsearch\Index;
-use InvalidArgumentException;
 
 trait ScoutElasticsearch
 {
@@ -13,15 +12,8 @@ trait ScoutElasticsearch
      * @throws \InvalidArgumentException
      * @return \Jenky\ScoutElasticsearch\Elasticsearch\Index
      */
-    public function elasticsearchIndex()
+    public function elasticsearchIndex(): Index
     {
-        $class = property_exists($this, 'elasticsearchIndex') ? $this->elasticsearchIndex : Index::class;
-        $index = new $class($this);
-
-        if ($index instanceof Index) {
-            return $index;
-        }
-
-        throw new InvalidArgumentException('The index must be instance of '. Index::class);
+        return new Index($this);
     }
 }

@@ -2,12 +2,13 @@
 
 namespace Jenky\ScoutElasticsearch;
 
-use Laravel\Scout\Builder;
-use Laravel\Scout\Engines\Engine;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Jenky\ScoutElasticsearch\Elasticsearch\Query;
 use Jenky\ScoutElasticsearch\Elasticsearch\Client;
+use Jenky\ScoutElasticsearch\Elasticsearch\Index;
+use Jenky\ScoutElasticsearch\Elasticsearch\Query;
+use Laravel\Scout\Builder;
+use Laravel\Scout\Engines\Engine;
 
 class ElasticsearchEngine extends Engine
 {
@@ -27,21 +28,21 @@ class ElasticsearchEngine extends Engine
      * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Client $client
      * @return void
      */
-    public function __construct(Client $client)
-    {
-        $this->elastic = $client;
-    }
+    // public function __construct()
+    // {
+    //     $this->elastic = $client;
+    // }
 
     /**
      * Create index if not exists.
      *
-     * @param  \Illuminate\Database\Eloquent\Model $model
+     * @param  \Jenky\ScoutElasticsearch\Elasticsearch\Index $index
      * @return void
      */
-    protected function initIndex(Model $model)
+    protected function initIndex(Index $index)
     {
-        if (! $this->elastic->indices()->exists(['index' => $model->elasticsearchIndex()->getIndexName()])) {
-            // Create new index.
+        if (! $index->exists()) {
+            $index->create();
         }
     }
 
@@ -57,11 +58,12 @@ class ElasticsearchEngine extends Engine
             return;
         }
 
-        $this->initIndex($models->first());
+        $index = $models->first()->elasticsearchIndex();
+        $this->initIndex($index);
 
         $params['body'] = [];
 
-        $models->each(function ($model) use (&$params) {
+        foreach ($models as $model) {
             if ($this->usesSoftDelete($model) && config('scout.soft_delete', false)) {
                 $model->pushSoftDeleteMetadata();
             }
@@ -78,15 +80,15 @@ class ElasticsearchEngine extends Engine
             $params['body'][] = [
                 'index' => [
                     '_id' => $model->getScoutKey(),
-                    '_index' => $model->elasticsearchIndex()->getIndexName(),
+                    '_index' => $index->getIndex(),
                     '_type' => static::DEFAULT_TYPE,
                 ],
             ];
 
             $params['body'][] = $array;
-        });
+        }
 
-        $this->elastic->bulk($params);
+        $index->getConnection()->bulk($params);
     }
 
     /**
@@ -109,7 +111,7 @@ class ElasticsearchEngine extends Engine
             ];
         });
 
-        $this->elastic->bulk($params);
+        $models->first()->elasticsearchIndex()->bulk($params);
     }
 
     /**
@@ -140,7 +142,7 @@ class ElasticsearchEngine extends Engine
             'size' => $perPage,
         ]);
 
-        $result['nbPages'] = $result['hits']['total'] / $perPage;
+        // $result['nbPages'] = $result['hits']['total'] / $perPage;
 
         return $result;
     }
@@ -154,24 +156,62 @@ class ElasticsearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = [])
     {
-        $query = new Query($builder, $options);
+        // $query = new Query($builder, $options);
 
-        $params = [
-            'index' => $builder->model->searchableAs(),
-            'type' => static::DEFAULT_TYPE,
-            'body' => $query->toArray(),
-        ];
+        // $params = [
+        //     'index' => $builder->model->searchableAs(),
+        //     'type' => static::DEFAULT_TYPE,
+        //     'body' => $query->toArray(),
+        // ];
+
+        $query = $this->parseBuilder($builder, $options);
 
         if ($builder->callback) {
             return call_user_func(
                 $builder->callback,
-                $this->elastic,
+                $query->getIndex()->getConnection(),
                 $query,
-                $params
+                $options
             );
         }
 
-        return $this->elastic->search($params);
+        return $query->get();
+    }
+
+    /**
+     * Parse the builder and add necessary queries.
+     *
+     * @return void
+     */
+    protected function parseBuilder(Builder $builder, array $options = [])
+    {
+        $index = $builder->model->elasticsearchIndex();
+
+        if (is_string($builder->query)) {
+            if ($builder->query || $builder->query != '*') {
+                $index = $index->queryString($builder->query);
+            }
+        }
+
+        foreach ($builder->wheres ?: [] as $column => $value) {
+            if (is_array($value)) {
+                $index = $index->terms($column, $value);
+            } else {
+                $index = $index->term($column, $value);
+            }
+        }
+
+        foreach ($builder->orders ?: [] as $order) {
+            $index = $index->orderBy($order['column'], $order['direction']);
+        }
+
+        $index = $index->limit($options['size'] ?? $builder->model->getPerPage());
+
+        if (isset($options['from'])) {
+            $index = $index->skip(intval($options['from']));
+        }
+
+        return $index;
     }
 
     /**
@@ -182,7 +222,7 @@ class ElasticsearchEngine extends Engine
      */
     public function mapIds($results)
     {
-        return collect($results['hits']['hits'])->pluck('_id')->values();
+        return $results->pluck('_id')->values();
     }
 
     /**
@@ -195,14 +235,15 @@ class ElasticsearchEngine extends Engine
      */
     public function map(Builder $builder, $results, $model)
     {
-        if ($results['hits']['total'] === 0) {
+        if ($results->total() === 0) {
             return $model->newCollection();
         }
 
-        $objectIds = collect($results['hits']['hits'])->pluck('objectID')->values()->all();
+        $objectIds = $results->pluck('_id')->values()->all();
 
         return $model->getScoutModelsByIds(
-            $builder, $objectIds
+            $builder,
+            $objectIds
         )->filter(function ($model) use ($objectIds) {
             return in_array($model->getScoutKey(), $objectIds);
         });
@@ -216,7 +257,7 @@ class ElasticsearchEngine extends Engine
      */
     public function getTotalCount($results)
     {
-        return $results['hits']['total'];
+        return $results->total();
     }
 
     /**
@@ -227,7 +268,7 @@ class ElasticsearchEngine extends Engine
      */
     public function flush($model)
     {
-        $this->elastic->indices()->flush(['index' => $model->searchableAs()]);
+        $model->elasticsearchIndex()->flush();
     }
 
     /**
